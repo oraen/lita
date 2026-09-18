@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f2f2f7">
+  <title>功能中心</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="page-shell">
+    <header class="page-header">
+      <h1>功能中心</h1>
+    </header>
+
+    <nav class="menu-list" aria-label="功能菜单">
+      <button class="menu-item" type="button" data-title="听觉赫兹测试">
+        <span class="menu-icon menu-icon--hearing" aria-hidden="true">
+          <svg viewBox="0 0 32 32" role="img">
+            <path d="M17 25.5c0 2-1.6 3.5-3.6 3.5S10 27.5 10 25.5c0-4.2 5.8-5 5.8-10.5 0-3.2-2.2-5.5-5.3-5.5S5 11.8 5 15"/>
+            <path d="M20.5 8.5c2 1.5 3.3 3.9 3.3 6.6M23.5 5c3 2.4 5 6 5 10"/>
+          </svg>
+        </span>
+        <strong>听觉赫兹测试</strong>
+        <span class="menu-arrow" aria-hidden="true"></span>
+      </button>
+
+      <button class="menu-item" type="button" data-title="发声音调测试">
+        <span class="menu-icon menu-icon--voice" aria-hidden="true">
+          <svg viewBox="0 0 32 32" role="img">
+            <rect x="11" y="3.5" width="10" height="17" rx="5"/>
+            <path d="M6.5 15.5a9.5 9.5 0 0 0 19 0M16 25v4M11 29h10"/>
+          </svg>
+        </span>
+        <strong>发声音调测试</strong>
+        <span class="menu-arrow" aria-hidden="true"></span>
+      </button>
+
+      <button class="menu-item" type="button" data-title="心理年龄测试">
+        <span class="menu-icon menu-icon--mind" aria-hidden="true">
+          <svg viewBox="0 0 32 32" role="img">
+            <path d="M16 27S4.5 20.3 4.5 11.8A6.8 6.8 0 0 1 16 6.9a6.8 6.8 0 0 1 11.5 4.9C27.5 20.3 16 27 16 27Z"/>
+            <path d="M11.5 14.5h2.3l1.6-3.4 2.2 7 1.5-3.6h2"/>
+          </svg>
+        </span>
+        <strong>心理年龄测试</strong>
+        <span class="menu-arrow" aria-hidden="true"></span>
+      </button>
+
+      <button class="menu-item" type="button" data-title="证书办理">
+        <span class="menu-icon menu-icon--certificate" aria-hidden="true">
+          <svg viewBox="0 0 32 32" role="img">
+            <path d="M7 3.5h18v25H7z"/>
+            <path d="M11 9h10M11 14h10M11 19h5"/>
+            <circle cx="21.5" cy="22" r="3"/>
+          </svg>
+        </span>
+        <strong>证书办理</strong>
+        <span class="menu-arrow" aria-hidden="true"></span>
+      </button>
+    </nav>
+  </main>
+
+  <div class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="./index.js"></script>
+</body>
+</html>
