@@ -4,13 +4,17 @@
   "description": "移动端功能测试工具",
   "type": "module",
   "scripts": {
-    "start": "vite",
-    "dev": "vite",
+    "start": "vite --host 0.0.0.0",
+    "dev": "vite --host 0.0.0.0",
     "build": "vite build",
+    "test": "node --test",
     "preview": "vite preview"
   },
   "private": true,
   "devDependencies": {
     "vite": "^8.3.0"
+  },
+  "dependencies": {
+    "pitchy": "^4.1.0"
   }
 }

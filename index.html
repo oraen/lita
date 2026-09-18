@@ -4,35 +4,41 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f2f2f7">
-  <title>功能中心</title>
+  <title>机能测试</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <main class="page-shell">
-    <header class="page-header">
-      <h1>功能中心</h1>
+    <header class="page-header" id="home-header">
+      <h1>机能测试</h1>
     </header>
 
-    <nav class="menu-list" aria-label="功能菜单">
-      <button class="menu-item" type="button" data-title="听觉赫兹测试">
+    <nav class="menu-list" id="home-view" aria-label="功能菜单">
+      <button class="menu-item" id="hearing-link" type="button" data-title="听觉赫兹测试">
         <span class="menu-icon menu-icon--hearing" aria-hidden="true">
           <svg viewBox="0 0 32 32" role="img">
             <path d="M17 25.5c0 2-1.6 3.5-3.6 3.5S10 27.5 10 25.5c0-4.2 5.8-5 5.8-10.5 0-3.2-2.2-5.5-5.3-5.5S5 11.8 5 15"/>
             <path d="M20.5 8.5c2 1.5 3.3 3.9 3.3 6.6M23.5 5c3 2.4 5 6 5 10"/>
           </svg>
         </span>
-        <strong>听觉赫兹测试</strong>
+        <span class="menu-label">
+          <strong>听觉赫兹测试</strong>
+          <small class="menu-note">正常人20Hz~20000Hz</small>
+        </span>
         <span class="menu-arrow" aria-hidden="true"></span>
       </button>
 
-      <button class="menu-item" type="button" data-title="发声音调测试">
+      <button class="menu-item" id="voice-link" type="button" data-title="发声音调测试">
         <span class="menu-icon menu-icon--voice" aria-hidden="true">
           <svg viewBox="0 0 32 32" role="img">
             <rect x="11" y="3.5" width="10" height="17" rx="5"/>
             <path d="M6.5 15.5a9.5 9.5 0 0 0 19 0M16 25v4M11 29h10"/>
           </svg>
         </span>
-        <strong>发声音调测试</strong>
+        <span class="menu-label">
+          <strong>发声音调测试</strong>
+          <small class="menu-note">普男85 Hz – 180 Hz，普女165 Hz – 255 Hz</small>
+        </span>
         <span class="menu-arrow" aria-hidden="true"></span>
       </button>
 
@@ -59,8 +65,165 @@
         <span class="menu-arrow" aria-hidden="true"></span>
       </button>
     </nav>
+
+    <section class="hearing-view" id="hearing-view" aria-labelledby="hearing-title" hidden>
+      <header class="test-header">
+        <button class="back-button" id="back-button" type="button" aria-label="返回机能测试" title="返回">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <h1 id="hearing-title">听觉赫兹测试</h1>
+      </header>
+
+      <div class="tone-area">
+        <h2 class="card-title">设备测试</h2>
+        <div class="frequency-readout">
+          <output id="frequency-value" for="frequency-slider">1,000</output>
+          <span>Hz</span>
+        </div>
+        <p class="tone-note">建议佩戴耳机，为了防止心理作用幻觉，在不确定能否听到的时候可以点击停止播放来对比差异。</p>
+        <div class="tone-controls">
+          <button class="step-button" id="decrease-frequency" type="button" aria-label="降低 1 Hz" title="降低 1 Hz">−</button>
+          <input id="frequency-slider" class="frequency-slider" type="range" min="10" max="25000" step="1" aria-label="频率" value="1000">
+          <button class="step-button" id="increase-frequency" type="button" aria-label="提高 1 Hz" title="提高 1 Hz">+</button>
+        </div>
+        <div class="range-labels"><span>10 Hz</span><span>25,000 Hz</span></div>
+        <button class="play-button" id="play-button" type="button" aria-pressed="false">播放声音</button>
+      </div>
+
+      <div class="professional-entry">
+        <h2 class="card-title">专业测试</h2>
+        <button class="play-button" id="professional-link" type="button">开始测试</button>
+      </div>
+
+      <section class="results-section" aria-labelledby="record-title">
+        <h2 id="record-title">听觉范围记录</h2>
+        <div class="history" id="history" aria-live="polite"></div>
+      </section>
+    </section>
+
+    <section class="professional-view" id="professional-view" aria-labelledby="professional-title" hidden>
+      <header class="test-header">
+        <button class="back-button" id="professional-back" type="button" aria-label="返回听觉赫兹测试" title="返回">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <h1 id="professional-title">专业测试</h1>
+      </header>
+      <div class="professional-panel">
+        <div id="test-intro">
+          <p class="test-phase-label">听觉范围</p>
+          <h2 class="test-prompt">准备开始</h2>
+          <p class="test-secondary">先测低音，再测高音</p>
+          <button class="play-button" id="start-test" type="button">开始测试</button>
+        </div>
+
+        <div id="test-session" hidden>
+          <div class="test-phases" aria-label="测试阶段">
+            <span id="low-phase">低音</span>
+            <span id="high-phase">高音</span>
+          </div>
+          <p class="test-phase-label" id="test-phase-label">低音测试</p>
+          <h2 class="test-prompt" id="test-prompt">现在有声音吗？</h2>
+          <p class="test-secondary" id="test-counter"></p>
+          <p class="test-feedback" id="test-feedback" role="status" hidden></p>
+          <button class="play-button" id="next-trial" type="button" hidden>开始下一次辨认</button>
+          <div class="test-answers" id="test-answers">
+            <button type="button" data-answer="certain">有（很肯定）</button>
+            <button type="button" data-answer="yes">有</button>
+            <button type="button" data-answer="no">无</button>
+          </div>
+        </div>
+
+        <div id="test-result" hidden>
+          <p class="test-phase-label">测试完成</p>
+          <h2 class="test-prompt" id="result-heading">听觉范围</h2>
+          <div class="result-values" id="result-values"></div>
+          <button class="play-button" id="restart-test" type="button">重新测试</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="voice-view" id="voice-view" aria-labelledby="voice-title" hidden>
+      <header class="test-header">
+        <button class="back-button" id="voice-back" type="button" aria-label="返回机能测试" title="返回">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <h1 id="voice-title">发声音调测试</h1>
+      </header>
+      <div class="voice-device">
+        <h2 class="card-title">设备测试</h2>
+        <div class="voice-device-display">
+          <span class="voice-mic-icon" aria-hidden="true">
+            <svg viewBox="0 0 32 32"><rect x="11" y="3.5" width="10" height="17" rx="5"/><path d="M6.5 15.5a9.5 9.5 0 0 0 19 0M16 25v4M11 29h10"/></svg>
+          </span>
+          <strong id="voice-device-status" role="status">检测麦克风</strong>
+          <span id="voice-device-detail">说话或哼唱，确认麦克风能够拾音</span>
+        </div>
+        <button class="play-button" id="voice-device-button" type="button">检测麦克风</button>
+      </div>
+      <div class="professional-entry">
+        <h2 class="card-title">专业测试</h2>
+        <button class="play-button" id="voice-professional-link" type="button">开始测试</button>
+      </div>
+      <section class="results-section" aria-labelledby="voice-record-title">
+        <h2 id="voice-record-title">音调范围记录</h2>
+        <div class="history" id="voice-history" aria-live="polite"></div>
+      </section>
+    </section>
+
+    <section class="voice-professional-view" id="voice-professional-view" aria-labelledby="voice-professional-title" hidden>
+      <header class="test-header">
+        <button class="back-button" id="voice-professional-back" type="button" aria-label="返回发声音调测试" title="返回">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <h1 id="voice-professional-title">专业测试</h1>
+      </header>
+      <div class="voice-stage">
+        <div id="voice-intro">
+          <p class="test-phase-label">发声音调</p>
+          <h2 class="test-prompt">准备好了吗？</h2>
+          <p class="test-secondary">用不同音高说话或哼唱，测出你的音调范围。</p>
+          <button class="play-button" id="voice-start" type="button">开始测试</button>
+          <p class="voice-error" id="voice-error" role="alert" hidden></p>
+        </div>
+        <div id="voice-session" hidden>
+          <p class="voice-recording" id="voice-recording" role="status"><span class="voice-recording-dot"></span>正在录音，可以尽情地叫</p>
+          <div class="voice-live">
+            <span class="voice-live-label">当前音调</span>
+            <strong id="voice-live-note">--</strong>
+            <span class="voice-live-hz" id="voice-live-hz">等待声音</span>
+          </div>
+          <div class="voice-range">
+            <div><span>本轮最低</span><strong id="voice-minimum">--</strong><small id="voice-minimum-note"></small></div>
+            <div><span>本轮最高</span><strong id="voice-maximum">--</strong><small id="voice-maximum-note"></small></div>
+          </div>
+          <button class="play-button voice-finish" id="voice-finish" type="button">测试完成</button>
+        </div>
+      </div>
+    </section>
   </main>
 
+  <dialog class="report-dialog" id="report-dialog" aria-labelledby="report-title">
+    <div class="report-header">
+      <h2 id="report-title">听觉测试报告</h2>
+      <button class="report-close" id="report-close" type="button" aria-label="关闭报告" title="关闭">×</button>
+    </div>
+    <dl class="report-details">
+      <div><dt>测试时间</dt><dd id="report-time"></dd></div>
+      <div><dt>最低听觉频率</dt><dd id="report-minimum"></dd></div>
+      <div><dt>最高听觉频率</dt><dd id="report-maximum"></dd></div>
+    </dl>
+  </dialog>
+  <dialog class="report-dialog" id="voice-report-dialog" aria-labelledby="voice-report-title">
+    <div class="report-header">
+      <h2 id="voice-report-title">发声音调测试报告</h2>
+      <button class="report-close" id="voice-report-close" type="button" aria-label="关闭报告" title="关闭">×</button>
+    </div>
+    <dl class="report-details">
+      <div><dt>测试时间</dt><dd id="voice-report-time"></dd></div>
+      <div><dt>最低音调</dt><dd id="voice-report-minimum"></dd></div>
+      <div><dt>最高音调</dt><dd id="voice-report-maximum"></dd></div>
+    </dl>
+  </dialog>
   <div class="toast" role="status" aria-live="polite"></div>
   <script type="module" src="./index.js"></script>
 </body>
