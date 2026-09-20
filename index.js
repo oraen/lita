@@ -115,6 +115,17 @@ let voiceFrame;
 let voiceRange = createPitchRange();
 let voiceStartedAt;
 
+function setAudioSessionType(type) {
+  if (!navigator.audioSession) return false;
+  try {
+    navigator.audioSession.type = type;
+    return true;
+  } catch (error) {
+    console.warn(`[音频会话] 无法切换为 ${type}`, error);
+    return false;
+  }
+}
+
 const VOICE_CHART_DURATION = 8000;
 const VOICE_CHART_MIN = VOICE_MIN_PITCH;
 const VOICE_CHART_MAX = VOICE_MAX_PITCH;
@@ -429,11 +440,14 @@ async function toggleSound() {
   if (startingSound) return;
   if (oscillator) {
     stopSound();
+    setAudioSessionType("auto");
     return;
   }
 
   startingSound = true;
   try {
+    // iOS 默认的 Web Audio 会话受侧边静音拨片控制，播放模式不受其影响。
+    setAudioSessionType("playback");
     const context = ensurePlaybackAudioContext();
     // iOS 要求音频节点在用户点击的同步调用栈中启动。
     startTone(frequency);
@@ -450,6 +464,7 @@ async function toggleSound() {
     });
   } catch (error) {
     stopSound();
+    setAudioSessionType("auto");
     console.error("[听觉赫兹测试] 无法启动音频", error);
     showToast("无法播放声音，请检查媒体音量后重试");
   } finally {
@@ -465,6 +480,7 @@ function resetProfessionalTest() {
   trialFeedback = null;
   stopSound();
   destroyProfessionalToneEngine();
+  setAudioSessionType("auto");
 }
 
 function showCurrentView() {
@@ -535,6 +551,7 @@ function stopVoiceCapture() {
     voiceContext = undefined;
   }
   voiceMode = null;
+  setAudioSessionType("auto");
   voiceDeviceButton.disabled = false;
   voiceDeviceButton.textContent = "检测麦克风";
 }
@@ -597,6 +614,8 @@ async function startVoiceCapture(mode) {
   try {
     if (!navigator.mediaDevices?.getUserMedia || !AudioContextConstructor)
       throw new Error("microphone unavailable");
+    // playback 会话与麦克风采集不兼容，录音前必须先切换。
+    setAudioSessionType("play-and-record");
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: {
         channelCount: 1,
@@ -916,6 +935,7 @@ async function startProfessionalTrial() {
   const generation = testGeneration;
   const signal = chooseProfessionalSignal(professionalTest);
   try {
+    setAudioSessionType("playback");
     const context = ensurePlaybackAudioContext();
     // 整场测试复用同一个振荡器，避免每轮启停在 iPhone 上产生宽频瞬态。
     const engineWasCreated = ensureProfessionalToneEngine(context);
