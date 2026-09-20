@@ -1,0 +1,26 @@
+html { touch-action: manipulation; }
+body { min-width: 0; -webkit-touch-callout: none; }
+img { max-width: 100%; }
+.page-shell {
+  padding: 36px 16px 28px;
+  padding-top: calc(36px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
+  padding-bottom: calc(28px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+}
+.home-author-card { width: 100%; text-align: left; }
+.home-author-card:active { background: #fff; }
+.report-dialog { width: calc(100% - 32px); max-width: 400px; max-height: calc(100vh - 48px); overflow-y: auto; }
+.psychology-selection-action {
+  width: calc(100% - 32px); max-width: 528px; bottom: 12px;
+  bottom: calc(12px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+}
+.toast { bottom: 24px; bottom: calc(24px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))); white-space: normal; text-align: center; }
+.certificate-download { width: 100%; border: 0; cursor: pointer; }
+.report-details dd { word-wrap: break-word; }
+button:focus, input:focus, select:focus, [tabindex]:focus { outline: 2px solid #9bc8f1; outline-offset: 2px; }
+@supports not (aspect-ratio: 4 / 5) {
+  .psychology-image-choice { height: 0; padding-top: 125%; }
+  .psychology-image-choice img { position: absolute; top: 0; left: 0; }
+  .psychology-pair-choice { position: relative; padding-top: 125%; }
+  .psychology-pair-choice img { position: absolute; top: 0; left: 0; height: calc(100% - 42px); }
+  .certificate-output { height: auto; }
+}

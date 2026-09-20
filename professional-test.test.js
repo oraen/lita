@@ -45,11 +45,11 @@ test("certain hearing confirms a sounding frequency immediately in both phases",
 
   state.phase = "high";
   state.lower = 10000;
-  state.upper = 25001;
+  state.upper = 20001;
   state.frequency = 15000;
   assert.equal(answerProfessionalTrial(state, true, "certain").correct, true);
   assert.equal(state.lower, 15000);
-  assert.equal(state.frequency, 20000);
+  assert.equal(state.frequency, 17500);
   assert.equal(state.confirmed, 2);
 });
 
@@ -121,7 +121,7 @@ test("a wrong answer during high search moves the upper bound immediately", () =
   const state = createProfessionalTest();
   state.phase = "high";
   state.lower = 10000;
-  state.upper = 25001;
+  state.upper = 20001;
   state.frequency = 15000;
   answerProfessionalTrial(state, true, "yes");
   answerProfessionalTrial(state, false, "yes");
@@ -163,7 +163,7 @@ test("finds a lower-range anchor when 10000 Hz is inaudible", () => {
 
 test("narrows audible bands above, below and across the starting tone", () => {
   for (const [minimum, maximum] of [
-    [17, 36],
+    [20, 36],
     [350, 2400],
     [9000, 20000],
     [12000, 18000],
@@ -175,13 +175,13 @@ test("narrows audible bands above, below and across the starting tone", () => {
 });
 
 test("handles both inclusive ends of the supported range", () => {
-  const state = runRange(10, 25000);
-  assert.equal(state.minimum, 10);
-  assert.equal(state.maximum, 25000);
+  const state = runRange(20, 20000);
+  assert.equal(state.minimum, 20);
+  assert.equal(state.maximum, 20000);
 });
 
 test("handles a single audible endpoint without leaving the range", () => {
-  for (const endpoint of [10, 25000]) {
+  for (const endpoint of [20, 20000]) {
     const state = runRange(endpoint, endpoint);
     assert.equal(state.minimum, endpoint);
     assert.equal(state.maximum, endpoint);

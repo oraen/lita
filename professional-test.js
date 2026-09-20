@@ -1,13 +1,16 @@
 const ANCHOR_FREQUENCIES = [
-  10000, 15000, 20000, 25000, 5000, 7500, 12500, 17500, 22500,
-  2500, 1000, 500, 100, 20, 10,
+  10000, 15000, 20000, 5000, 7500, 12500, 17500,
+  2500, 1000, 500, 100, 20,
 ];
+
+export const PROFESSIONAL_MIN_FREQUENCY = 20;
+export const PROFESSIONAL_MAX_FREQUENCY = 20000;
 
 export function createProfessionalTest() {
   return {
     phase: "low",
     anchorIndex: 0,
-    lower: 9,
+    lower: PROFESSIONAL_MIN_FREQUENCY - 1,
     upper: null,
     frequency: ANCHOR_FREQUENCIES[0],
     trials: 0,
@@ -51,7 +54,7 @@ function advanceFrequency(test, audible) {
   if (test.phase === "low" && test.upper === null) {
     if (audible) {
       test.upper = test.frequency;
-      if (test.upper === 10) startHigh(test);
+      if (test.upper === PROFESSIONAL_MIN_FREQUENCY) startHigh(test);
       else test.frequency = test.upper === 10000
         ? 5000
         : Math.floor((test.lower + test.upper) / 2);
@@ -88,7 +91,7 @@ function startHigh(test) {
   test.minimum = test.upper;
   test.phase = "high";
   test.lower = test.minimum;
-  test.upper = 25001;
+  test.upper = PROFESSIONAL_MAX_FREQUENCY + 1;
   test.frequency = test.minimum < 15000
     ? 15000
     : Math.floor((test.lower + test.upper) / 2);

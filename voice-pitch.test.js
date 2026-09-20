@@ -16,18 +16,26 @@ test("converts frequencies to western note names and octaves", () => {
 test("updates range only after consecutive, stable frames", () => {
   const range = createPitchRange();
   assert.equal(trackPitch(range, 220), false);
-  assert.equal(trackPitch(range, 221), false);
-  assert.equal(trackPitch(range, 219), true);
-  assert.equal(range.minimum, 219);
+  assert.equal(trackPitch(range, 221), true);
+  assert.equal(range.minimum, 221);
   assert.equal(trackPitch(range, 900), false);
-  assert.equal(range.maximum, 219);
-  trackPitch(range, 440);
-  trackPitch(range, 441);
-  assert.equal(trackPitch(range, 439), true);
-  assert.equal(range.maximum, 439);
+  assert.equal(range.maximum, 221);
+  assert.equal(trackPitch(range, 440), false);
+  assert.equal(trackPitch(range, 441), true);
+  assert.equal(range.maximum, 441);
   trackPitch(range, 20);
   assert.equal(trackPitch(range, 440), false);
-  assert.equal(range.minimum, 219);
+  assert.equal(range.minimum, 221);
+});
+
+test("accepts natural pitch movement and high pitches up to 2200 Hz", () => {
+  const range = createPitchRange();
+  assert.equal(trackPitch(range, 220), false);
+  assert.equal(trackPitch(range, 233), true);
+  assert.equal(trackPitch(range, 2000), false);
+  assert.equal(trackPitch(range, 2020), true);
+  assert.equal(range.maximum, 2020);
+  assert.equal(trackPitch(range, 2201), false);
 });
 
 test("detects the fundamental of a voiced-like sine wave", () => {

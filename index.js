@@ -3,13 +3,26 @@ import {
   chooseProfessionalSignal,
   answerProfessionalTrial,
 } from "./professional-test.js";
+import { getHearingLevelRank, getHearingTitle } from "./hearing-title.js";
+import { getVoiceLevelRank, getVoiceTitle } from "./voice-title.js";
+import { getLevelBadgeClass } from "./level-badge.js";
 import { PitchDetector } from "pitchy";
-import { createPitchRange, frequencyToNote, trackPitch } from "./voice-pitch.js";
+import {
+  VOICE_MAX_PITCH,
+  VOICE_MIN_PITCH,
+  createPitchRange,
+  frequencyToNote,
+  trackPitch,
+} from "./voice-pitch.js";
+import { setupPsychologyTest } from "./psychology.js";
+import { setupVisionTest } from "./vision.js";
+import { setupCertificate } from "./certificate.js";
 
 const menuItems = document.querySelectorAll(".menu-item");
 const toast = document.querySelector(".toast");
 const homeHeader = document.querySelector("#home-header");
 const homeView = document.querySelector("#home-view");
+const homeAuthorCard = document.querySelector("#home-author-card");
 const hearingView = document.querySelector("#hearing-view");
 const slider = document.querySelector("#frequency-slider");
 const frequencyValue = document.querySelector("#frequency-value");
@@ -35,6 +48,11 @@ const resultHeading = document.querySelector("#result-heading");
 const resultValues = document.querySelector("#result-values");
 const voiceView = document.querySelector("#voice-view");
 const voiceProfessionalView = document.querySelector("#voice-professional-view");
+const psychologyView = document.querySelector("#psychology-view");
+const psychologyTestView = document.querySelector("#psychology-test-view");
+const visionView = document.querySelector("#vision-view");
+const visionTestView = document.querySelector("#vision-test-view");
+const certificateView = document.querySelector("#certificate-view");
 const voiceDeviceButton = document.querySelector("#voice-device-button");
 const voiceDeviceStatus = document.querySelector("#voice-device-status");
 const voiceDeviceDetail = document.querySelector("#voice-device-detail");
@@ -51,11 +69,16 @@ const voiceMinimumNote = document.querySelector("#voice-minimum-note");
 const voiceMaximumNote = document.querySelector("#voice-maximum-note");
 const voiceHistory = document.querySelector("#voice-history");
 const voiceReportDialog = document.querySelector("#voice-report-dialog");
+const psychologyReportDialog = document.querySelector("#psychology-report-dialog");
+const visionReportDialog = document.querySelector("#vision-report-dialog");
+const voiceTestChart = document.querySelector("#voice-test-chart");
 
 const MIN_FREQUENCY = 10;
 const MAX_FREQUENCY = 25000;
 const STORAGE_KEY = "lita-hearing-records";
 const VOICE_STORAGE_KEY = "lita-voice-records";
+const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
+const PROFESSIONAL_SILENT_GAIN = 0.00001;
 const formatNumber = new Intl.NumberFormat("zh-CN");
 const formatDate = new Intl.DateTimeFormat("zh-CN", {
   year: "numeric",
@@ -70,6 +93,8 @@ let frequency = 1000;
 let audioContext;
 let oscillator;
 let gain;
+let professionalOscillator;
+let professionalGain;
 let toastTimer;
 let startingSound = false;
 let heldPointerId = null;
@@ -89,6 +114,150 @@ let voiceContext;
 let voiceFrame;
 let voiceRange = createPitchRange();
 let voiceStartedAt;
+
+const VOICE_CHART_DURATION = 8000;
+const VOICE_CHART_MIN = VOICE_MIN_PITCH;
+const VOICE_CHART_MAX = VOICE_MAX_PITCH;
+const VOICE_MIN_RMS = 0.003;
+const VOICE_MIN_CLARITY = 0.5;
+const VOICE_SAMPLE_INTERVAL = 45;
+const voiceCharts = {
+  test: createVoiceChartState(voiceTestChart),
+};
+
+function createVoiceChartState(canvas) {
+  return {
+    canvas,
+    points: [],
+    smoothedHz: null,
+    lastVoicedAt: 0,
+  };
+}
+
+function resetVoiceChart(mode) {
+  const chart = voiceCharts[mode];
+  if (!chart) return;
+  chart.points = [];
+  chart.smoothedHz = null;
+  chart.lastVoicedAt = 0;
+  drawVoiceChart(chart, performance.now());
+}
+
+function addVoiceChartPoint(mode, now, hz) {
+  const chart = voiceCharts[mode];
+  if (!chart) return;
+  let displayHz = null;
+
+  if (hz !== null) {
+    const followsRecentPitch = chart.smoothedHz !== null && now - chart.lastVoicedAt < 400;
+    chart.smoothedHz = followsRecentPitch
+      ? chart.smoothedHz * 0.68 + hz * 0.32
+      : hz;
+    chart.lastVoicedAt = now;
+    displayHz = chart.smoothedHz;
+  } else if (now - chart.lastVoicedAt >= 400) {
+    chart.smoothedHz = null;
+  }
+
+  chart.points.push({ time: now, hz: displayHz });
+  const cutoff = now - VOICE_CHART_DURATION;
+  while (chart.points.length && chart.points[0].time < cutoff) chart.points.shift();
+  drawVoiceChart(chart, now);
+}
+
+function drawVoiceChart(chart, now) {
+  const canvas = chart.canvas;
+  const width = canvas.clientWidth;
+  const height = canvas.clientHeight;
+  if (!width || !height) return;
+
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const pixelWidth = Math.round(width * dpr);
+  const pixelHeight = Math.round(height * dpr);
+  if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+    canvas.width = pixelWidth;
+    canvas.height = pixelHeight;
+  }
+
+  const context = canvas.getContext("2d");
+  context.setTransform(dpr, 0, 0, dpr, 0, 0);
+  context.clearRect(0, 0, width, height);
+
+  const left = 38;
+  const right = 10;
+  const top = 12;
+  const bottom = 22;
+  const plotWidth = width - left - right;
+  const plotHeight = height - top - bottom;
+  const logMin = Math.log(VOICE_CHART_MIN);
+  const logMax = Math.log(VOICE_CHART_MAX);
+  const yForHz = (hz) => top + (logMax - Math.log(hz)) / (logMax - logMin) * plotHeight;
+
+  context.font = "10px -apple-system, BlinkMacSystemFont, sans-serif";
+  context.textAlign = "right";
+  context.textBaseline = "middle";
+  [100, 200, 400, 800, 1600].forEach((hz) => {
+    const y = yForHz(hz);
+    context.fillStyle = "#92989a";
+    context.fillText(String(hz), left - 7, y);
+    context.beginPath();
+    context.moveTo(left, y);
+    context.lineTo(width - right, y);
+    context.strokeStyle = "#e2e8e5";
+    context.lineWidth = 1;
+    context.stroke();
+  });
+
+  context.textAlign = "left";
+  context.textBaseline = "alphabetic";
+  context.fillStyle = "#92989a";
+  context.fillText("Hz", 8, 12);
+  context.fillText("8 秒前", left, height - 6);
+  context.textAlign = "right";
+  context.fillText("现在", width - right, height - 6);
+
+  const cutoff = now - VOICE_CHART_DURATION;
+  const voicedPoints = chart.points.filter((point) => point.hz !== null);
+  if (!voicedPoints.length) {
+    context.fillStyle = "#9a9fa1";
+    context.font = "13px -apple-system, BlinkMacSystemFont, sans-serif";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText("等待检测到稳定音调", left + plotWidth / 2, top + plotHeight / 2);
+    return;
+  }
+
+  context.save();
+  context.beginPath();
+  context.rect(left, top, plotWidth, plotHeight);
+  context.clip();
+  context.beginPath();
+  let drawing = false;
+  let previousTime = 0;
+  chart.points.forEach((point) => {
+    if (point.hz === null || point.time - previousTime > 220) {
+      drawing = false;
+      if (point.hz === null) return;
+    }
+    const x = left + (point.time - cutoff) / VOICE_CHART_DURATION * plotWidth;
+    const y = yForHz(Math.min(VOICE_CHART_MAX, Math.max(VOICE_CHART_MIN, point.hz)));
+    if (drawing) context.lineTo(x, y);
+    else context.moveTo(x, y);
+    drawing = true;
+    previousTime = point.time;
+  });
+  context.strokeStyle = "#31836c";
+  context.lineWidth = 2.25;
+  context.lineCap = "round";
+  context.lineJoin = "round";
+  context.stroke();
+  context.restore();
+}
+
+function drawVisibleVoiceCharts() {
+  const now = performance.now();
+  Object.values(voiceCharts).forEach((chart) => drawVoiceChart(chart, now));
+}
 
 function stopStepping() {
   window.clearTimeout(holdDelay);
@@ -128,6 +297,10 @@ function showToast(message) {
   toastTimer = window.setTimeout(() => toast.classList.remove("is-visible"), 1800);
 }
 
+const psychologyController = setupPsychologyTest({ formatDate, showToast });
+const visionController = setupVisionTest({ formatDate, showToast });
+const certificateController = setupCertificate({ showToast });
+
 function setFrequency(hz) {
   frequency = Math.min(MAX_FREQUENCY, Math.max(MIN_FREQUENCY, Math.round(hz)));
   frequencyValue.value = formatNumber.format(frequency);
@@ -145,27 +318,111 @@ function stopSound() {
   const activeOscillator = oscillator;
   const activeGain = gain;
   oscillator = null;
-  activeGain.gain.setTargetAtTime(0, audioContext.currentTime, 0.012);
+  scheduleSmoothGain(activeGain.gain, 0, 0.16);
   activeOscillator.addEventListener("ended", () => {
     activeOscillator.disconnect();
     activeGain.disconnect();
   }, { once: true });
-  activeOscillator.stop(audioContext.currentTime + 0.08);
+  activeOscillator.stop(audioContext.currentTime + 0.18);
   playButton.textContent = "播放声音";
   playButton.classList.remove("is-playing");
   playButton.setAttribute("aria-pressed", "false");
 }
 
+function ensurePlaybackAudioContext() {
+  if (!AudioContextConstructor) throw new Error("Web Audio API unavailable");
+  if (!audioContext || audioContext.state === "closed") {
+    audioContext = new AudioContextConstructor();
+  }
+  return audioContext;
+}
+
+async function resumeAudioContext(context) {
+  if (context.state === "running") return;
+  const resumeResult = context.resume();
+  if (resumeResult && typeof resumeResult.then === "function") await resumeResult;
+}
+
+function scheduleSmoothGain(parameter, target, duration) {
+  const now = audioContext.currentTime;
+  const start = Math.max(0, parameter.value);
+  const curve = new Float32Array(96);
+  for (let index = 0; index < curve.length; index += 1) {
+    const progress = index / (curve.length - 1);
+    const eased = 0.5 - 0.5 * Math.cos(Math.PI * progress);
+    curve[index] = start + (target - start) * eased;
+  }
+  parameter.cancelScheduledValues(now);
+  parameter.setValueCurveAtTime(curve, now, duration);
+}
+
+function professionalOutputGain(hz) {
+  if (hz < 80) return 0.12;
+  if (hz < 200) return 0.12 + (hz - 80) / 120 * 0.16;
+  if (hz > 18000) return 0.2;
+  if (hz > 14000) return 0.28;
+  return 0.4;
+}
+
 function startTone(hz) {
+  const now = audioContext.currentTime;
   gain = audioContext.createGain();
-  gain.gain.value = 0;
+  gain.gain.setValueAtTime(0, now);
   gain.connect(audioContext.destination);
   oscillator = audioContext.createOscillator();
   oscillator.type = "sine";
-  oscillator.frequency.value = hz;
+  oscillator.frequency.setValueAtTime(hz, now);
   oscillator.connect(gain);
-  oscillator.start();
-  gain.gain.setTargetAtTime(1.0, audioContext.currentTime, 0.02);
+  oscillator.start(now);
+  scheduleSmoothGain(gain.gain, 0.5, 0.32);
+}
+
+function ensureProfessionalToneEngine(context) {
+  if (professionalOscillator && professionalGain) return false;
+  const now = context.currentTime;
+  professionalGain = context.createGain();
+  professionalGain.gain.setValueAtTime(PROFESSIONAL_SILENT_GAIN, now);
+  professionalGain.connect(context.destination);
+  professionalOscillator = context.createOscillator();
+  professionalOscillator.type = "sine";
+  professionalOscillator.frequency.setValueAtTime(1000, now);
+  professionalOscillator.connect(professionalGain);
+  professionalOscillator.start(now);
+  return true;
+}
+
+function setProfessionalTone(hz, audible) {
+  if (!professionalOscillator || !professionalGain || !audioContext) return;
+  professionalOscillator.frequency.setValueAtTime(hz, audioContext.currentTime);
+  scheduleSmoothGain(
+    professionalGain.gain,
+    audible ? professionalOutputGain(hz) : PROFESSIONAL_SILENT_GAIN,
+    audible ? 0.8 : 0.24,
+  );
+}
+
+function silenceProfessionalTone() {
+  if (!professionalGain || !audioContext) return;
+  scheduleSmoothGain(professionalGain.gain, PROFESSIONAL_SILENT_GAIN, 0.28);
+}
+
+function destroyProfessionalToneEngine() {
+  if (!professionalOscillator || !professionalGain || !audioContext) {
+    professionalOscillator = undefined;
+    professionalGain = undefined;
+    return;
+  }
+  const activeOscillator = professionalOscillator;
+  const activeGain = professionalGain;
+  const now = audioContext.currentTime;
+  professionalOscillator = undefined;
+  professionalGain = undefined;
+  scheduleSmoothGain(activeGain.gain, 0, 0.18);
+  activeOscillator.addEventListener("ended", () => {
+    activeOscillator.disconnect();
+    activeGain.disconnect();
+  }, { once: true });
+  activeOscillator.stop(now + 0.2);
 }
 
 async function toggleSound() {
@@ -177,15 +434,24 @@ async function toggleSound() {
 
   startingSound = true;
   try {
-    audioContext ??= new AudioContext();
-    await audioContext.resume();
-    if (hearingView.hidden) return;
+    const context = ensurePlaybackAudioContext();
+    // iOS 要求音频节点在用户点击的同步调用栈中启动。
     startTone(frequency);
     playButton.textContent = "停止播放";
     playButton.classList.add("is-playing");
     playButton.setAttribute("aria-pressed", "true");
-  } catch {
-    showToast("无法播放声音");
+    await resumeAudioContext(context);
+    if (context.state !== "running") throw new Error(`AudioContext state: ${context.state}`);
+    if (hearingView.hidden) stopSound();
+    console.debug("[听觉赫兹测试] 音频已启动", {
+      state: context.state,
+      sampleRate: context.sampleRate,
+      frequency,
+    });
+  } catch (error) {
+    stopSound();
+    console.error("[听觉赫兹测试] 无法启动音频", error);
+    showToast("无法播放声音，请检查媒体音量后重试");
   } finally {
     startingSound = false;
   }
@@ -198,25 +464,45 @@ function resetProfessionalTest() {
   trialActive = false;
   trialFeedback = null;
   stopSound();
+  destroyProfessionalToneEngine();
 }
 
 function showCurrentView() {
   if (reportDialog.open) reportDialog.close();
   if (voiceReportDialog.open) voiceReportDialog.close();
+  if (psychologyReportDialog.open) psychologyReportDialog.close();
+  if (visionReportDialog.open) visionReportDialog.close();
   const isHearing = location.hash === "#hearing";
   const isProfessional = location.hash === "#professional";
   const isVoice = location.hash === "#voice";
   const isVoiceProfessional = location.hash === "#voice-professional";
-  homeHeader.hidden = isHearing || isProfessional || isVoice || isVoiceProfessional;
+  const isPsychology = location.hash === "#psychology";
+  const isPsychologyTest = location.hash === "#psychology-test";
+  const isVision = location.hash === "#vision";
+  const isVisionTest = location.hash === "#vision-test";
+  const isCertificate = location.hash === "#certificate";
+  homeHeader.hidden = isHearing || isProfessional || isVoice || isVoiceProfessional ||
+    isPsychology || isPsychologyTest || isVision || isVisionTest || isCertificate;
   homeView.hidden = homeHeader.hidden;
+  if (homeAuthorCard) homeAuthorCard.hidden = homeHeader.hidden;
   hearingView.hidden = !isHearing;
   professionalView.hidden = !isProfessional;
   voiceView.hidden = !isVoice;
   voiceProfessionalView.hidden = !isVoiceProfessional;
-  document.title = isVoiceProfessional ? "发声音调专业测试 - 机能测试" :
-    isVoice ? "发声音调测试 - 机能测试" :
-      isProfessional ? "专业测试 - 机能测试" :
-        isHearing ? "听觉赫兹测试 - 机能测试" : "机能测试";
+  psychologyView.hidden = !isPsychology;
+  psychologyTestView.hidden = !isPsychologyTest;
+  visionView.hidden = !isVision;
+  visionTestView.hidden = !isVisionTest;
+  certificateView.hidden = !isCertificate;
+  document.title = isCertificate ? "证书办理 - 慢手耳鼻喉测试" :
+    isVisionTest ? "视觉测试中 - 机能测试" :
+    isVision ? "视觉测试 - 机能测试" :
+      isPsychologyTest ? "心理年龄测试中 - 机能测试" :
+    isPsychology ? "心理年龄测试 - 机能测试" :
+      isVoiceProfessional ? "发声音调专业测试 - 机能测试" :
+        isVoice ? "发声音调测试 - 机能测试" :
+          isProfessional ? "专业测试 - 机能测试" :
+            isHearing ? "听觉赫兹测试 - 机能测试" : "机能测试";
   if (!isHearing) {
     stopStepping();
     stopSound();
@@ -228,6 +514,14 @@ function showCurrentView() {
     stopVoiceCapture();
     if (!isVoiceProfessional) resetVoiceSession();
   }
+  if (isPsychologyTest) psychologyController.ensureStarted();
+  else psychologyController.leaveTest();
+  if (isPsychology) psychologyController.renderHistory();
+  if (isVisionTest) visionController.ensureStarted();
+  else visionController.leaveTest();
+  if (isVision) visionController.renderHistory();
+  if (isCertificate) certificateController.refresh();
+  window.requestAnimationFrame(drawVisibleVoiceCharts);
 }
 
 function stopVoiceCapture() {
@@ -287,6 +581,7 @@ function showVoiceRange() {
 
 async function startVoiceCapture(mode) {
   stopVoiceCapture();
+  resetVoiceChart(mode);
   const generation = voiceGeneration;
   voiceMode = mode;
   const isTest = mode === "test";
@@ -300,17 +595,22 @@ async function startVoiceCapture(mode) {
     voiceDeviceDetail.textContent = "请允许浏览器使用麦克风";
   }
   try {
-    if (!navigator.mediaDevices?.getUserMedia || !window.AudioContext)
+    if (!navigator.mediaDevices?.getUserMedia || !AudioContextConstructor)
       throw new Error("microphone unavailable");
     const stream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+      audio: {
+        channelCount: 1,
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: true,
+      },
     });
     if (generation !== voiceGeneration || (isTest ? voiceProfessionalView.hidden : voiceView.hidden)) {
       stream.getTracks().forEach((track) => track.stop());
       return;
     }
     voiceStream = stream;
-    voiceContext = new AudioContext();
+    voiceContext = new AudioContextConstructor();
     await voiceContext.resume();
     if (generation !== voiceGeneration) return;
     const source = voiceContext.createMediaStreamSource(stream);
@@ -335,13 +635,16 @@ async function startVoiceCapture(mode) {
     function sample(now) {
       if (generation !== voiceGeneration) return;
       voiceFrame = window.requestAnimationFrame(sample);
-      if (now - lastSample < 60) return;
+      if (now - lastSample < VOICE_SAMPLE_INTERVAL) return;
       lastSample = now;
       analyser.getFloatTimeDomainData(buffer);
       const rms = Math.sqrt(buffer.reduce((sum, value) => sum + value * value, 0) / buffer.length);
-      const [hz, clarity] = rms >= 0.012
+      const [hz, clarity] = rms >= VOICE_MIN_RMS
         ? detector.findPitch(buffer, voiceContext.sampleRate) : [0, 0];
-      if (clarity >= 0.85 && hz >= 65 && hz <= 1600) {
+      const hasStablePitch = clarity >= VOICE_MIN_CLARITY &&
+        hz >= VOICE_MIN_PITCH && hz <= VOICE_MAX_PITCH;
+      addVoiceChartPoint(mode, now, hasStablePitch ? hz : null);
+      if (hasStablePitch) {
         lastSound = now;
         if (isTest) {
           voiceLiveNote.textContent = frequencyToNote(hz);
@@ -410,6 +713,7 @@ function openVoiceReport(record) {
     formatDate.format(new Date(record.time));
   document.querySelector("#voice-report-minimum").textContent = voicePitchLabel(record.minimum);
   document.querySelector("#voice-report-maximum").textContent = voicePitchLabel(record.maximum);
+  document.querySelector("#voice-report-title-name").textContent = getVoiceTitle(record.maximum);
   voiceReportDialog.showModal();
 }
 
@@ -425,7 +729,7 @@ function renderVoiceRecords() {
   }
   const header = document.createElement("div");
   header.className = "history-header";
-  for (const label of ["时间", "最低音调", "最高音调"]) {
+  for (const label of ["时间", "最低音调", "最高音调", "级别"]) {
     const cell = document.createElement("span");
     cell.textContent = label;
     header.append(cell);
@@ -450,6 +754,10 @@ function renderVoiceRecords() {
       }
       row.append(cell);
     }
+    const title = document.createElement("strong");
+    title.className = `level-badge ${getLevelBadgeClass(getVoiceLevelRank(record.maximum))}`;
+    title.textContent = getVoiceTitle(record.maximum);
+    row.append(title);
     row.addEventListener("click", () => openVoiceReport(record));
     voiceHistory.append(row);
   }
@@ -501,7 +809,7 @@ function renderRecords() {
 
   const header = document.createElement("div");
   header.className = "history-header";
-  for (const label of ["时间", "最低音调", "最高音调"]) {
+  for (const label of ["时间", "最低音调", "最高音调", "级别"]) {
     const cell = document.createElement("span");
     cell.textContent = label;
     header.append(cell);
@@ -522,11 +830,15 @@ function renderRecords() {
     const maximum = document.createElement("span");
     maximum.textContent = record.maximum == null
       ? "未测得" : `${formatNumber.format(record.maximum)} Hz`;
-    row.append(time, minimum, maximum);
+    const title = document.createElement("strong");
+    title.className = `level-badge ${getLevelBadgeClass(getHearingLevelRank(record.maximum))}`;
+    title.textContent = getHearingTitle(record.maximum);
+    row.append(time, minimum, maximum, title);
     row.addEventListener("click", () => {
       document.querySelector("#report-time").textContent = time.textContent;
       document.querySelector("#report-minimum").textContent = minimum.textContent;
       document.querySelector("#report-maximum").textContent = maximum.textContent;
+      document.querySelector("#report-hearing-title").textContent = title.textContent;
       reportDialog.showModal();
     });
     history.append(row);
@@ -604,14 +916,23 @@ async function startProfessionalTrial() {
   const generation = testGeneration;
   const signal = chooseProfessionalSignal(professionalTest);
   try {
-    audioContext ??= new AudioContext();
-    await audioContext.resume();
-    if (generation !== testGeneration || professionalView.hidden) return;
-    if (signal) startTone(professionalTest.frequency);
+    const context = ensurePlaybackAudioContext();
+    // 整场测试复用同一个振荡器，避免每轮启停在 iPhone 上产生宽频瞬态。
+    const engineWasCreated = ensureProfessionalToneEngine(context);
+    await resumeAudioContext(context);
+    if (context.state !== "running") throw new Error(`AudioContext state: ${context.state}`);
+    // 首轮先静音预热音频通道，硬件初始化声不会泄露本轮是否有声音。
+    await new Promise((resolve) => window.setTimeout(resolve, engineWasCreated ? 360 : 100));
+    if (generation !== testGeneration || professionalView.hidden) {
+      return;
+    }
+    setProfessionalTone(professionalTest.frequency, signal);
     trialSignal = signal;
     trialActive = true;
-  } catch {
-    showToast("无法启动测试声音");
+  } catch (error) {
+    destroyProfessionalToneEngine();
+    console.error("[听觉专业测试] 无法启动音频", error);
+    showToast("无法启动测试声音，请检查媒体音量");
   } finally {
     if (generation === testGeneration) {
       trialStarting = false;
@@ -622,6 +943,7 @@ async function startProfessionalTrial() {
 
 function startProfessionalTest() {
   stopSound();
+  destroyProfessionalToneEngine();
   testGeneration += 1;
   professionalTest = createProfessionalTest();
   trialActive = false;
@@ -635,6 +957,30 @@ document.querySelector("#hearing-link").addEventListener("click", () => {
 });
 document.querySelector("#voice-link").addEventListener("click", () => {
   location.hash = "voice";
+});
+document.querySelector("#psychology-link").addEventListener("click", () => {
+  location.hash = "psychology";
+});
+document.querySelector("#psychology-back").addEventListener("click", () => {
+  location.hash = "";
+});
+document.querySelector("#psychology-test-back").addEventListener("click", () => {
+  location.hash = "psychology";
+});
+document.querySelector("#vision-link").addEventListener("click", () => {
+  location.hash = "vision";
+});
+document.querySelector("#vision-back").addEventListener("click", () => {
+  location.hash = "";
+});
+document.querySelector("#vision-test-back").addEventListener("click", () => {
+  location.hash = "vision";
+});
+document.querySelector("#certificate-link").addEventListener("click", () => {
+  location.hash = "certificate";
+});
+document.querySelector("#certificate-back").addEventListener("click", () => {
+  location.hash = "";
 });
 document.querySelector("#voice-back").addEventListener("click", () => {
   location.hash = "";
@@ -687,7 +1033,7 @@ testAnswers.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-answer]");
   if (!button || !trialActive || !professionalTest) return;
   trialActive = false;
-  stopSound();
+  silenceProfessionalTone();
   const phase = professionalTest.phase;
   const judgedFrequency = professionalTest.frequency;
   const result = answerProfessionalTrial(professionalTest, trialSignal, button.dataset.answer);
@@ -698,12 +1044,15 @@ testAnswers.addEventListener("click", (event) => {
     signal: trialSignal,
     answer: button.dataset.answer,
   };
-  if (result.done) saveProfessionalResult();
+  if (result.done) {
+    saveProfessionalResult();
+    destroyProfessionalToneEngine();
+  }
   renderProfessionalState();
 });
 
 menuItems.forEach((item) => {
-  if (item.id === "hearing-link" || item.id === "voice-link") return;
+  if (["hearing-link", "voice-link", "psychology-link", "vision-link", "certificate-link"].includes(item.id)) return;
   item.addEventListener("click", () => {
     showToast(`${item.dataset.title}功能正在准备中`);
   });
@@ -721,6 +1070,7 @@ window.addEventListener("pointercancel", (event) => {
   if (event.pointerId === heldPointerId) stopStepping();
 });
 window.addEventListener("blur", stopStepping);
+window.addEventListener("resize", () => window.requestAnimationFrame(drawVisibleVoiceCharts));
 playButton.addEventListener("click", toggleSound);
 window.addEventListener("hashchange", showCurrentView);
 window.addEventListener("pagehide", () => {
