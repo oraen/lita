@@ -13,6 +13,8 @@ html = html.replace('<script src="./app.js"></script>', '<script src="./setup.js
 await writeFile(path.join(work, "index.html"), html);
 await writeFile(path.join(work, "setup.js"), `
 window.failures = []; window.bridgeCalls = [];
+// Exercise session transitions; this does not simulate the iPhone mute switch.
+Object.defineProperty(navigator, 'audioSession', {configurable:true, value:{type:'auto'}});
 window.addEventListener('error', e => failures.push(e.message));
 window.addEventListener('unhandledrejection', e => failures.push(String(e.reason)));
 // Exercise the app's ES2017 runtime fallbacks in modern Chrome as well.
@@ -57,16 +59,31 @@ await writeFile(path.join(work, "checks.js"), `
   }
   await go('hearing'); q('#history .history-row').click(); ok(q('#report-dialog').open,'hearing card'); q('#report-dialog').close();
   q('#play-button').click(); await wait(); ok(q('#play-button').getAttribute('aria-pressed')==='true','audio start');
+  ok(navigator.audioSession.type==='playback','hearing playback session');
   q('#frequency-slider').value='1500'; q('#frequency-slider').dispatchEvent(new Event('input'));
   ok(q('#frequency-value').value.includes('1,500'),'frequency slider'); q('#play-button').click();
+  ok(navigator.audioSession.type==='auto','hearing stop session');
+  await go('professional'); q('#start-test').click();
+  for (let i=0;i<8;i++) await wait();
+  ok(navigator.audioSession.type==='playback' && !q('#test-answers').hidden,'professional playback session');
   await go('voice'); q('#voice-history .history-row').click(); ok(q('#voice-report-dialog').open,'voice card'); q('#voice-report-dialog').close();
+  ok(navigator.audioSession.type==='auto','professional exit session');
   await go('voice-professional'); q('#voice-start').click(); await wait();
   ok(!q('#voice-error').hidden,'microphone permission error');
   window.micDenied=false; q('#voice-start').click(); await wait();
   ok(q('#voice-error').hidden && !q('#voice-session').hidden,'microphone capture');
+  ok(navigator.audioSession.type==='play-and-record','microphone session');
   await go('voice');
   ok(window.syntheticTracks.every(track=>track.readyState==='ended'),'microphone release');
+  ok(navigator.audioSession.type==='auto','microphone exit session');
   await window.syntheticContext.close();
+  Object.defineProperty(navigator, 'audioSession', {configurable:true, value:undefined});
+  await go('hearing'); q('#play-button').click(); await wait();
+  ok(q('#play-button').getAttribute('aria-pressed')==='true','unsupported session fallback'); q('#play-button').click();
+  Object.defineProperty(navigator, 'audioSession', {configurable:true, value:{set type(value){throw new Error('unsupported session mode');}}});
+  q('#play-button').click(); await wait();
+  ok(q('#play-button').getAttribute('aria-pressed')==='true','rejected session fallback'); q('#play-button').click();
+  Object.defineProperty(navigator, 'audioSession', {configurable:true, value:{type:'auto'}});
   await go('psychology-test');
   ok(document.querySelectorAll('.psychology-image-choice').length >= 12,'image library');
   for (const image of document.querySelectorAll('.psychology-image-choice img')) { image.loading='eager'; }
